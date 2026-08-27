@@ -1,4 +1,4 @@
-/*! Kasso hero — ambient background (POC) v3
+/*! Kasso hero — ambient background (POC) v4
  *  Drops a slow-drifting light field behind the hero card.
  *  No dependencies. ~6KB. Safe to load from <head> (defers itself).
  */
@@ -22,11 +22,16 @@
 
   // Sampled from the hero: card purple, the mint + lavender from the
   // product photography, and a deeper purple to keep the corners weighted.
+  // px/py are drift rates in radians per second. They are calibrated, not
+  // arbitrary: at the original rates the brightest moving pixel changed by
+  // 0.5/255 per second, which is below the threshold of perception — the
+  // effect measured as animated but read as a static gradient. These rates
+  // put it near 3/255 per second, which reads as gentle drift.
   var BLOBS = [
-    { c: [126, 115, 192], r: 0.55, a: 0.55, sx: 0.18, sy: 0.30, px: 0.021, py: 0.013, o: 0.0 },
-    { c: [ 92, 214, 190], r: 0.42, a: 0.22, sx: 0.72, sy: 0.20, px: 0.017, py: 0.023, o: 1.7 },
-    { c: [176, 164, 240], r: 0.50, a: 0.38, sx: 0.86, sy: 0.72, px: 0.013, py: 0.019, o: 3.1 },
-    { c: [ 58,  44, 138], r: 0.60, a: 0.45, sx: 0.34, sy: 0.88, px: 0.023, py: 0.011, o: 4.6 }
+    { c: [126, 115, 192], r: 0.55, a: 0.55, sx: 0.18, sy: 0.30, px: 0.126, py: 0.078, o: 0.0 },
+    { c: [ 92, 214, 190], r: 0.42, a: 0.22, sx: 0.72, sy: 0.20, px: 0.102, py: 0.138, o: 1.7 },
+    { c: [176, 164, 240], r: 0.50, a: 0.38, sx: 0.86, sy: 0.72, px: 0.078, py: 0.114, o: 3.1 },
+    { c: [ 58,  44, 138], r: 0.60, a: 0.45, sx: 0.34, sy: 0.88, px: 0.138, py: 0.066, o: 4.6 }
   ];
 
   function init() {
@@ -87,7 +92,7 @@
         // Two out-of-phase sines per axis, so the drift never visibly loops.
         var x = (b.sx + 0.16 * Math.sin(t * b.px + b.o) + 0.07 * Math.sin(t * b.px * 1.7 + b.o * 2)) * w;
         var y = (b.sy + 0.14 * Math.cos(t * b.py + b.o) + 0.06 * Math.sin(t * b.py * 2.1 + b.o)) * h;
-        var rad = span * b.r * (1 + 0.08 * Math.sin(t * 0.01 + b.o));
+        var rad = span * b.r * (1 + 0.08 * Math.sin(t * 0.06 + b.o));
         var a = b.a * CONFIG.intensity;
         var rgb = b.c[0] + "," + b.c[1] + "," + b.c[2];
         var g = ctx.createRadialGradient(x, y, 0, x, y, rad);

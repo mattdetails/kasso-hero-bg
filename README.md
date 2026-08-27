@@ -33,6 +33,19 @@ purple, a deeper purple to weight the corners, and the mint + lavender from the
 product photography. Each blob moves on two out-of-phase sine waves per axis, so the
 drift never visibly loops.
 
+### Drift rates are calibrated
+
+The `px`/`py` rates in `BLOBS` are not arbitrary. At the rates this shipped with
+originally, the brightest moving pixel in the visible frame changed by **0.5 out of
+255 per second** — below the threshold of perception. The effect measured as animated
+(diff two screenshots seconds apart and they differ) but read as a completely static
+gradient to anyone actually looking at it.
+
+The current rates put it near **3/255 per second**, about 20/255 over ten seconds,
+which reads as gentle drift without pulling focus. If you retune, measure the change
+per second rather than trusting a screenshot diff — that distinction is what the
+original rates got wrong.
+
 ### Performance
 
 - Canvas renders at a **200px backing width** and is upscaled by the browser. The
