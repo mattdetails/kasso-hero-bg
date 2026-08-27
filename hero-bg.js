@@ -1,6 +1,6 @@
-/*! Kasso hero — ambient background (POC) v2
+/*! Kasso hero — ambient background (POC) v3
  *  Drops a slow-drifting light field behind the hero card.
- *  No dependencies. ~4KB. Safe to load from <head> (defers itself).
+ *  No dependencies. ~6KB. Safe to load from <head> (defers itself).
  */
 (function () {
   "use strict";
@@ -16,6 +16,9 @@
     intensity: 1,     // 0.5 = half as strong; raise to make it more obvious
     resolution: 200   // canvas backing width in px; upscaled by the browser
   };
+
+  // Clamp on height/width, so a transient layout can't allocate a huge canvas.
+  var MAX_ASPECT = 4;
 
   // Sampled from the hero: card purple, the mint + lavender from the
   // product photography, and a deeper purple to keep the corners weighted.
@@ -58,17 +61,24 @@
     // Render small and let the browser upscale — the gradients are soft
     // enough that this is indistinguishable from full-res, and far cheaper
     // than a full-size CSS blur.
-    var w = CONFIG.resolution, h = 1;
+    var w = 0, h = 0, lastT = 0;
     function resize() {
       var r = host.getBoundingClientRect();
-      if (!r.width) return;
-      w = CONFIG.resolution;
-      h = Math.max(1, Math.round(w * (r.height / r.width)));
+      // Bail on a degenerate box: a head script can run before layout has
+      // settled, and a bad measurement would otherwise be locked in.
+      if (r.width < 1 || r.height < 1) return false;
+      var nw = CONFIG.resolution;
+      var nh = Math.max(1, Math.round(nw * Math.min(r.height / r.width, MAX_ASPECT)));
+      if (nw === w && nh === h) return false;
+      w = nw; h = nh;
       canvas.width = w;
       canvas.height = h;
+      return true;
     }
 
     function draw(t) {
+      if (!w || !h) return;
+      lastT = t;
       t *= CONFIG.speed;
       ctx.clearRect(0, 0, w, h);
       var span = Math.max(w, h);
@@ -121,11 +131,20 @@
       if (document.hidden) pause(); else play();
     });
 
-    var rt;
-    window.addEventListener("resize", function () {
-      clearTimeout(rt);
-      rt = setTimeout(function () { resize(); if (!running) draw(0); }, 150);
-    });
+    // Re-measure whenever the hero's own box changes. This also fires once on
+    // observe, which self-corrects any bad measurement taken before layout
+    // settled — the reason a plain resize listener wasn't enough.
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () {
+        if (resize() && !running) draw(lastT);
+      }).observe(host);
+    } else {
+      var rt;
+      window.addEventListener("resize", function () {
+        clearTimeout(rt);
+        rt = setTimeout(function () { if (resize() && !running) draw(lastT); }, 150);
+      });
+    }
   }
 
   if (document.readyState === "loading") {

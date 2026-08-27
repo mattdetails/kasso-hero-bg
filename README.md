@@ -43,6 +43,19 @@ drift never visibly loops.
   `visibilitychange` pauses it when the tab is backgrounded.
 - Honours `prefers-reduced-motion` by painting a single static frame.
 
+### Robustness
+
+A head script runs before layout has settled, so the canvas can take a bad first
+measurement. Two guards handle that:
+
+- A `ResizeObserver` on the hero re-measures whenever its box changes. It also fires
+  once on `observe`, which self-corrects any measurement taken too early. A plain
+  `window.resize` listener was not enough — without a resize event, a wrong size was
+  locked in permanently. Falls back to a debounced resize listener where
+  `ResizeObserver` is unavailable.
+- `MAX_ASPECT` clamps the derived height, so a transient layout can't allocate a
+  huge canvas. Degenerate boxes (zero width or height) are skipped entirely.
+
 ### Safety
 
 - Script is a no-op if the hero isn't found, if `<canvas>` is unsupported, or if it
