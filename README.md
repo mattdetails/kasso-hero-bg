@@ -1,8 +1,12 @@
 # kasso-hero-bg
 
-Ambient animated background for the Kasso (Relume) hero — a slow-drifting light
-field behind the hero card. No dependencies, ~5KB, injected via a single `<script>`
-tag in the site's head. Built as a proof of concept.
+Front-end enhancements for the Kasso (Relume) site, injected via `<script>` tags in
+the site's head. No dependencies, no build step. Built as a proof of concept.
+
+| File | What it does |
+| --- | --- |
+| `hero-bg.js` | Ambient animated background behind the hero card |
+| `navbar.js` | Docks the floating navbar to full width on scroll |
 
 ## Install
 
@@ -22,7 +26,31 @@ Get the current SHA with:
 git rev-parse HEAD
 ```
 
-## How it works
+## navbar.js — dock on scroll
+
+The navbar is `position: fixed` at `top/left/right: 24px` with `max-width: 1024px`
+and a 16px radius — a floating pill. Past `expandAt` (40px of scroll) it animates to
+`top/left/right: 0`, full width, square corners, with a soft shadow; it returns to
+the pill at `collapseAt` (12px). The two thresholds differ on purpose, so a scroll
+position resting near the boundary can't flip the state back and forth.
+
+**Content does not move.** When docked, horizontal padding grows to
+`max(pad, calc((100% - 1024px)/2 + pad))`, which keeps the logo and links on exactly
+the column they occupied while floating — verified at 1970px wide, where the logo sits
+at x=487 in both states. Only the bar's chrome expands. That padding base is held in a
+`--kx-nav-pad` custom property refreshed on resize, so a theme that pads differently
+per breakpoint still lands on the right column.
+
+`max-width: 100%` rather than `100vw`: for a fixed element the containing block
+excludes the scrollbar, so the bar can't overflow the viewport.
+
+The overrides use `!important` deliberately — they exist to beat the theme's own
+rules from an injected stylesheet, and the module has no other way to win the cascade.
+
+Scroll handling is passive and coalesced into one `requestAnimationFrame`, and the
+transition is disabled under `prefers-reduced-motion`.
+
+## hero-bg.js — how it works
 
 The hero is a solid purple `section` (`rgb(79,64,169)`) with an inset card floating
 on top, leaving a visible purple frame around it (`176px` top, `121px` sides,
