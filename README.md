@@ -7,7 +7,9 @@ the site's head. No dependencies, no build step. Built as a proof of concept.
 | --- | --- |
 | `hero-bg-gl.js` | Ambient background, WebGL — **use this one** |
 | `hero-bg.js` | The original 2D-canvas version, kept for reference |
-| `navbar.js` | Docks the floating navbar to full width on scroll |
+| `navbar.js` | Full-width navbar at rest, floating pill on scroll |
+| `image-reveal.js` | Fades and slides images in as they enter the viewport |
+| `smooth-scroll.js` | Locomotive Scroll v5 — **load as `type="module"`** |
 
 `hero-bg-gl.js` supersedes `hero-bg.js` and carries its own 2D fallback, so load
 one or the other, never both — whichever runs first wins and the second is a no-op.
@@ -65,6 +67,40 @@ Get the current SHA with:
 ```
 git rev-parse HEAD
 ```
+
+## smooth-scroll.js — Locomotive Scroll v5
+
+Loads Locomotive `5.0.1` through jsDelivr's `/+esm` endpoint, so it must be a module
+script:
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/gh/mattdetails/kasso-hero-bg@SHA/smooth-scroll.js"></script>
+```
+
+Module scripts are deferred by default, so no `defer` attribute.
+
+**Version 5 specifically, not 4.** v4 hijacks scrolling with a `transform` container:
+`window.scrollY` stays near zero, `position: fixed` misbehaves, and
+`IntersectionObserver` gets unreliable. All three other modules here depend on exactly
+those, so v4 would break the navbar, the image reveal, and the hero's off-screen
+pause. v5 is built on Lenis (`lenis@1.3.17`) and drives the real window scroll —
+verified with `body { transform: none }` and the navbar reacting to Lenis-driven
+scroll.
+
+Two things this theme forces:
+
+- It sets `scroll-behavior: smooth` on `<html>`. That fights Lenis and makes anchor
+  jumps stutter as both animations run at once, so it is forced back to `auto`.
+- In-page links are written as `/#id`, not `#id`. A `a[href^="#"]` handler would miss
+  every one of them, so anchors are matched by comparing the resolved pathname, then
+  offset by the fixed navbar's measured height.
+
+Skipped entirely under `prefers-reduced-motion` — hijacked scrolling is one of the
+clearest cases for honouring that. Lenis's 380-byte stylesheet is inlined rather than
+fetched separately.
+
+Tune `lerp` at the top: lower is smoother and heavier, higher is snappier. `0` would
+disable smoothing.
 
 ## navbar.js — full width at rest, pill on scroll
 
