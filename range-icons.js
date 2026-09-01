@@ -1,6 +1,6 @@
-/*! Kasso — "The Range" icon animation (POC) v1
- *  Staggered rise as the section enters view, replayed on every entry, plus
- *  an outline-to-filled morph on card hover.
+/*! Kasso — "The Range" icon line-draw (POC) v2
+ *  Swaps the three Material Symbols glyphs for stroked SVGs and draws them
+ *  in, replayed on every entry into view and on card hover.
  *  No dependencies. Safe to load from <head> (defers itself).
  */
 (function () {
@@ -8,110 +8,141 @@
 
   var CONFIG = {
     section: "#sc-feature-list-section-horizontal",
-    cardSelector: "div.stack.gap-element-large",  // nearest ancestor that is the card
-    rise: 10,             // px the icon lifts in from
-    revealMs: 520,
-    stagger: 90,          // ms between the three
-    hoverScale: 1.12,
-    hoverLift: 1,         // px
-    hoverMs: 280,
-    enterRatio: 0.25,     // section must be this visible to play
-    easing: "cubic-bezier(.16,1,.3,1)"
+    cardSelector: "div.stack.gap-element-large",
+    strokeWidth: 1.75,    // 2 is Lucide's default; 1.75 is closer to the
+                          // theme's wght-200 Material glyphs
+    drawMs: 900,          // scroll-in draw
+    partStagger: 90,      // ms between parts within one icon
+    iconStagger: 140,     // ms between the three icons
+    hoverMs: 600,         // hover redraw, snappier
+    hoverPartStagger: 60,
+    enterRatio: 0.25,
+    easing: "cubic-bezier(.65,0,.35,1)"
   };
+
+  // Lucide (ISC). Genuinely stroked paths — Material Symbols ships filled
+  // shapes that only look like line art, so there is no centreline to draw.
+  var ICONS = {
+    spa:         '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+    water_drop:  '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+    content_cut: '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>'
+  };
+  var ORDER = ["spa", "water_drop", "content_cut"];
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function buildSvg(body, px) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", px);
+    svg.setAttribute("height", px);
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", CONFIG.strokeWidth);
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    svg.style.display = "block";
+    svg.style.overflow = "visible";
+    svg.innerHTML = body;
+    return svg;
+  }
 
   function init() {
     var sec = document.querySelector(CONFIG.section);
     if (!sec || sec.dataset.kxIcons) return;
 
-    // The icons are Material Symbols ligatures, not SVG — find them by the
-    // font actually in use rather than by a class that may change.
-    var icons = [].slice.call(sec.querySelectorAll("*")).filter(function (e) {
+    var glyphs = [].slice.call(sec.querySelectorAll("*")).filter(function (e) {
       return /material symbols/i.test(getComputedStyle(e).fontFamily || "");
     });
-    if (!icons.length) return;
+    if (!glyphs.length) return;
+
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var items = [];
+
+    for (var i = 0; i < glyphs.length; i++) {
+      var g = glyphs[i];
+      var name = (g.textContent || "").trim();
+      var body = ICONS[name] || ICONS[ORDER[i]];
+      if (!body) continue;
+
+      var px = Math.round(parseFloat(getComputedStyle(g).fontSize)) || 32;
+      var svg = buildSvg(body, px);
+
+      // Keep the original ligature so this can be undone, then swap.
+      g.dataset.kxGlyph = name;
+      g.textContent = "";
+      g.appendChild(svg);
+
+      // getTotalLength needs the node in the document. Measuring and setting
+      // the initial offset happen in this same task, so nothing paints
+      // half-drawn in between.
+      var parts = [].slice.call(svg.querySelectorAll("path,circle,line,polyline,rect"));
+      for (var p = 0; p < parts.length; p++) {
+        var el = parts[p];
+        var len = 0;
+        try { len = el.getTotalLength(); } catch (e) { len = 0; }
+        if (!len || !isFinite(len)) len = 100;
+        el.__len = len;
+        el.style.strokeDasharray = len + " " + len;
+        el.style.strokeDashoffset = reduce ? "0" : String(len);
+      }
+      items.push({ svg: svg, parts: parts, card: g.closest(CONFIG.cardSelector) });
+    }
+
+    if (!items.length) return;
     sec.dataset.kxIcons = "1";
 
-    // The theme already drives this font's axes. Read its exact settings and
-    // change only FILL, so the hover state can interpolate cleanly instead of
-    // snapping the other axes back to their defaults.
-    var baseFVS = getComputedStyle(icons[0]).fontVariationSettings || "";
-    var fillFVS = /"FILL"\s*0/.test(baseFVS) ? baseFVS.replace(/"FILL"\s*0/, '"FILL" 1') : null;
+    if (reduce) return;   // lines shown complete, nothing animates
 
-    var css =
-      // Wrapper carries the reveal, icon carries the hover: two elements, two
-      // transforms, so neither has to overwrite the other.
-      ".kx-ico-w{transition:opacity " + CONFIG.revealMs + "ms " + CONFIG.easing + "," +
-        "transform " + CONFIG.revealMs + "ms " + CONFIG.easing + ";}" +
-      ".kx-ico-w.kx-ico-out{opacity:0;transform:translateY(" + CONFIG.rise + "px);}" +
-      ".kx-ico-w.kx-ico-in{opacity:1;transform:none;}" +
-      ".kx-ico{display:block;transform-origin:50% 50%;" +
-        "transition:transform " + CONFIG.hoverMs + "ms " + CONFIG.easing +
-        (fillFVS ? ",font-variation-settings " + CONFIG.hoverMs + "ms " + CONFIG.easing : "") + ";}" +
-      ".kx-ico-card:hover .kx-ico,.kx-ico-card:focus-within .kx-ico{" +
-        "transform:translateY(-" + CONFIG.hoverLift + "px) scale(" + CONFIG.hoverScale + ");" +
-        (fillFVS ? "font-variation-settings:" + fillFVS + ";" : "") +
-      "}" +
-      // Reduced motion: keep the fill morph, which is not movement, and drop
-      // every transform.
-      "@media (prefers-reduced-motion: reduce){" +
-        ".kx-ico-w,.kx-ico-w.kx-ico-out,.kx-ico-w.kx-ico-in{opacity:1!important;transform:none!important;transition:none!important;}" +
-        ".kx-ico-card:hover .kx-ico,.kx-ico-card:focus-within .kx-ico{transform:none;}" +
-      "}";
-
-    var style = document.createElement("style");
-    style.setAttribute("data-kx-icons-style", "");
-    style.textContent = css;
-    (document.head || document.documentElement).appendChild(style);
-
-    var wraps = [];
-    for (var i = 0; i < icons.length; i++) {
-      var icon = icons[i];
-      icon.classList.add("kx-ico");
-      var wrap = icon.parentElement;
-      wrap.classList.add("kx-ico-w", "kx-ico-out");
-      wraps.push(wrap);
-      var card = icon.closest(CONFIG.cardSelector);
-      // Hovering a 32px glyph is a fiddly target; the card is the real one.
-      if (card) card.classList.add("kx-ico-card");
+    function draw(item, baseDelay, dur, partStep) {
+      item.parts.forEach(function (el, i) {
+        el.style.transition = "none";
+        el.style.strokeDashoffset = String(el.__len);
+        void el.getBoundingClientRect();      // flush, so the restart takes
+        el.style.transition = "stroke-dashoffset " + dur + "ms " + CONFIG.easing +
+                              " " + (baseDelay + i * partStep) + "ms";
+        el.style.strokeDashoffset = "0";
+      });
     }
+
+    function undraw(item) {
+      item.parts.forEach(function (el) {
+        el.style.transition = "none";
+        el.style.strokeDashoffset = String(el.__len);
+      });
+    }
+
+    // Hover redraws the same lines, quicker.
+    items.forEach(function (item) {
+      var target = item.card || item.svg;
+      target.addEventListener("mouseenter", function () {
+        draw(item, 0, CONFIG.hoverMs, CONFIG.hoverPartStagger);
+      });
+      target.addEventListener("focusin", function () {
+        draw(item, 0, CONFIG.hoverMs, CONFIG.hoverPartStagger);
+      });
+    });
 
     var playing = false;
-    var timers = [];
-
-    function clearTimers() {
-      for (var t = 0; t < timers.length; t++) clearTimeout(timers[t]);
-      timers = [];
-    }
-
-    function play() {
-      if (playing) return;
-      playing = true;
-      clearTimers();
-      wraps.forEach(function (w, i) {
-        timers.push(setTimeout(function () {
-          w.classList.remove("kx-ico-out");
-          w.classList.add("kx-ico-in");
-        }, i * CONFIG.stagger));
-      });
-    }
-
-    function reset() {
-      if (!playing) return;
-      playing = false;
-      clearTimers();
-      wraps.forEach(function (w) {
-        w.classList.remove("kx-ico-in");
-        w.classList.add("kx-ico-out");
-      });
-    }
 
     // No unobserve: the brief is that this replays on every entry. Reset only
-    // once the section is fully clear, so scrolling near the boundary can't
+    // once the section is fully clear, so scrolling near the boundary cannot
     // retrigger it repeatedly.
     var io = new IntersectionObserver(function (entries) {
       var e = entries[0];
-      if (e.isIntersecting && e.intersectionRatio >= CONFIG.enterRatio) play();
-      else if (!e.isIntersecting) reset();
+      if (e.isIntersecting && e.intersectionRatio >= CONFIG.enterRatio) {
+        if (playing) return;
+        playing = true;
+        items.forEach(function (item, i) {
+          draw(item, i * CONFIG.iconStagger, CONFIG.drawMs, CONFIG.partStagger);
+        });
+      } else if (!e.isIntersecting) {
+        if (!playing) return;
+        playing = false;
+        items.forEach(undraw);
+      }
     }, { threshold: [0, CONFIG.enterRatio] });
 
     io.observe(sec);
