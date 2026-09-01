@@ -9,6 +9,7 @@ the site's head. No dependencies, no build step. Built as a proof of concept.
 | `hero-bg.js` | The original 2D-canvas version, kept for reference |
 | `navbar.js` | Full-width navbar at rest, floating pill on scroll |
 | `image-reveal.js` | Fades and slides images in as they enter the viewport |
+| `range-icons.js` | Animates the three icons in "The Range" section |
 | `smooth-scroll.js` | Locomotive Scroll v5 — **load as `type="module"`** |
 
 `hero-bg-gl.js` supersedes `hero-bg.js` and carries its own 2D fallback, so load
@@ -67,6 +68,37 @@ Get the current SHA with:
 ```
 git rev-parse HEAD
 ```
+
+## range-icons.js — "The Range" icons
+
+The three icons rise 10px and fade in, staggered 90ms, as the section enters view,
+and morph from outlined to filled on card hover.
+
+**They are not SVGs.** They are Material Symbols ligatures — `spa`, `water_drop`,
+`content_cut` — rendered from a variable icon font, so they are found by the font in
+use rather than by a class name.
+
+**The hover morph uses the font's FILL axis.** The theme already drives this font
+(`"FILL" 0, "GRAD" 0, "opsz" 24, "wght" 200`), so the hover rule is generated at
+runtime by reading those computed settings and changing only FILL. Declaring `FILL 1`
+alone would reset GRAD, opsz and wght to their defaults and the icon would visibly
+shift weight mid-transition. If that read fails it falls back to the transform alone.
+
+**Two elements, two transforms.** The reveal is applied to the icon's wrapper and the
+hover to the icon itself, so neither effect has to overwrite the other's `transform`.
+No custom-property interpolation or `@property` registration needed.
+
+Hover is bound to the surrounding card, not the glyph — a 32px hover target is
+needlessly fiddly — and `:focus-within` matches it so keyboard users get the same
+state.
+
+The observer deliberately never unobserves, because the brief was to replay on every
+entry. It resets only once the section is *fully* clear, so scrolling around the
+boundary can't retrigger it repeatedly. Verified: enter → `IN,IN,IN`, leave →
+`out,out,out`, re-enter → replays.
+
+Under `prefers-reduced-motion` the fill morph is kept — it is a shape change, not
+movement — and every transform is dropped.
 
 ## smooth-scroll.js — Locomotive Scroll v5
 
