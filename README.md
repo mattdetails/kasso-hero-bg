@@ -66,26 +66,39 @@ Get the current SHA with:
 git rev-parse HEAD
 ```
 
-## navbar.js — dock on scroll
+## navbar.js — full width at rest, pill on scroll
 
-The navbar is `position: fixed` at `top/left/right: 24px` with `max-width: 1024px`
-and a 16px radius — a floating pill. Past `expandAt` (40px of scroll) it animates to
-`top/left/right: 0`, full width, square corners, with a soft shadow; it returns to
-the pill at `collapseAt` (12px). The two thresholds differ on purpose, so a scroll
+At the top of the page the bar spans the full viewport, flush at the top edge with
+square corners. Past `contractAt` (40px of scroll) it contracts to the theme's own
+floating pill — `top/left/right: 24px`, `max-width: 1024px`, 16px radius — and
+expands again at `expandAt` (12px). The two thresholds differ on purpose, so a scroll
 position resting near the boundary can't flip the state back and forth.
 
-**Content does not move.** When docked, horizontal padding grows to
-`max(pad, calc((100% - 1024px)/2 + pad))`, which keeps the logo and links on exactly
-the column they occupied while floating — verified at 1970px wide, where the logo sits
-at x=487 in both states. Only the bar's chrome expands. That padding base is held in a
-`--kx-nav-pad` custom property refreshed on resize, so a theme that pads differently
-per breakpoint still lands on the right column.
+**The floating state has no hardcoded values.** The wide state is written as
+`:not(.kx-nav-float)`, so adding that class simply drops the overrides and the theme's
+own rules take over. That matters across breakpoints: the pill rests at `top: 24px` on
+desktop and `top: 20px` on mobile, and both restore correctly without the module
+knowing either number.
+
+**Content does not move.** While wide, horizontal padding grows to
+`max(pad, calc((100% - 1024px)/2 + pad))`, keeping the logo and links on the same
+column they occupy in the pill — the logo measures x=487 in both states at 1970px
+wide. Only the bar's chrome changes.
+
+Two ordering details matter, because the *resting* state is now the modified one:
+
+- **The stylesheet is injected at parse time**, not on DOM ready. The nav does not
+  exist yet, so every candidate selector is styled up front. Applying it after DOM
+  ready would paint the theme's pill for a frame and then snap to full width.
+- **Transitions are gated behind `.kx-nav-ready`**, added two frames after the initial
+  state settles, so a page restored at a scrolled position doesn't animate the
+  contraction on load.
 
 `max-width: 100%` rather than `100vw`: for a fixed element the containing block
 excludes the scrollbar, so the bar can't overflow the viewport.
 
-The overrides use `!important` deliberately — they exist to beat the theme's own
-rules from an injected stylesheet, and the module has no other way to win the cascade.
+The overrides use `!important` deliberately — they exist to beat the theme's own rules
+from an injected stylesheet, and the module has no other way to win the cascade.
 
 Scroll handling is passive and coalesced into one `requestAnimationFrame`, and the
 transition is disabled under `prefers-reduced-motion`.
