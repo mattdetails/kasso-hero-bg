@@ -69,36 +69,49 @@ Get the current SHA with:
 git rev-parse HEAD
 ```
 
-## range-icons.js — "The Range" icons
+## range-icons.js — "The Range" icon line-draw
 
-The three icons rise 10px and fade in, staggered 90ms, as the section enters view,
-and morph from outlined to filled on card hover.
+The three icons draw themselves in, stroke by stroke, each time the section enters
+view, and redraw faster on card hover.
 
-**They are not SVGs.** They are Material Symbols ligatures — `spa`, `water_drop`,
-`content_cut` — rendered from a variable icon font, so they are found by the font in
-use rather than by a class name.
+### Why the icons had to be replaced
 
-**The hover morph uses the font's FILL axis.** The theme already drives this font
-(`"FILL" 0, "GRAD" 0, "opsz" 24, "wght" 200`), so the hover rule is generated at
-runtime by reading those computed settings and changing only FILL. Declaring `FILL 1`
-alone would reset GRAD, opsz and wght to their defaults and the icon would visibly
-shift weight mid-transition. If that read fails it falls back to the transform alone.
+The originals were Material Symbols ligatures. A line-draw animates
+`stroke-dashoffset` along a stroked path, and text cannot be stroke-animated. Nor can
+Material's own SVGs: they are single **filled** shapes that only look like line art —
+`stroke=0`, no centreline to draw along.
 
-**Two elements, two transforms.** The reveal is applied to the icon's wrapper and the
-hover to the icon itself, so neither effect has to overwrite the other's `transform`.
-No custom-property interpolation or `@property` registration needed.
+So the glyphs are swapped for stroked Lucide equivalents:
 
-Hover is bound to the surrounding card, not the glyph — a 32px hover target is
-needlessly fiddly — and `:focus-within` matches it so keyboard users get the same
-state.
+| Card | Was | Now | Parts |
+| --- | --- | --- | --- |
+| Skin Care | `spa` | `leaf` | 2 |
+| Face Wash | `water_drop` | `droplet` | 1 |
+| Hair Products | `content_cut` | `scissors` | 5 |
 
-The observer deliberately never unobserves, because the brief was to replay on every
-entry. It resets only once the section is *fully* clear, so scrolling around the
-boundary can't retrigger it repeatedly. Verified: enter → `IN,IN,IN`, leave →
-`out,out,out`, re-enter → replays.
+The bottom two are near-identical to what they replace. `leaf` is the one genuinely
+visible change — swap it for `flower` or `sparkles` in the `ICONS` map if you prefer
+something closer to the original lotus.
 
-Under `prefers-reduced-motion` the fill morph is kept — it is a shape change, not
-movement — and every transform is dropped.
+### How it draws
+
+Each part is measured with `getTotalLength()`, then `stroke-dasharray` and
+`stroke-dashoffset` are set to that length and animated to zero, staggered within an
+icon and across the three. Measuring and setting the initial offset happen in the
+same task as the swap, so nothing ever paints half-drawn.
+
+The redraw resets the offset, forces a reflow, then re-applies the transition —
+without that flush the browser coalesces both writes and no animation runs.
+
+Size comes from the glyph's computed `font-size` and the stroke uses `currentColor`,
+so the theme keeps control of both. The original ligature is kept in `data-kx-glyph`,
+so the swap is reversible.
+
+Hover is bound to the surrounding card rather than the 32px glyph, with `focusin`
+matching for keyboard users. The observer never unobserves — the brief was to replay
+on every entry — and resets only once the section is fully clear, so scrolling around
+the boundary can't retrigger it. Under `prefers-reduced-motion` the lines render
+complete and nothing animates.
 
 ## smooth-scroll.js — Locomotive Scroll v5
 
