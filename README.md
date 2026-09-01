@@ -5,8 +5,48 @@ the site's head. No dependencies, no build step. Built as a proof of concept.
 
 | File | What it does |
 | --- | --- |
-| `hero-bg.js` | Ambient animated background behind the hero card |
+| `hero-bg-gl.js` | Ambient background, WebGL — **use this one** |
+| `hero-bg.js` | The original 2D-canvas version, kept for reference |
 | `navbar.js` | Docks the floating navbar to full width on scroll |
+
+`hero-bg-gl.js` supersedes `hero-bg.js` and carries its own 2D fallback, so load
+one or the other, never both — whichever runs first wins and the second is a no-op.
+
+## Why WebGL
+
+The 2D path renders a 440px-wide canvas and lets the browser upscale it. On a 2560px
+hi-DPI display that is 5.78x in CSS pixels, 11.6x in device pixels. That is the
+obvious problem, but it is not the main one.
+
+Measured on a full-resolution 3818px scanline with dithering off, the longest run of
+a single colour is **127px**. That is 8-bit quantisation, and it survives at any
+resolution — rendering at 4K would not have removed it. It is also amplified by the
+shipped `intensity: 1.95`, which roughly doubles the step between adjacent bands
+versus the original `1.0`.
+
+So the fix is two things, and the second matters more:
+
+1. Evaluate the field per-pixel in a fragment shader at device resolution, removing
+   the upscale entirely.
+2. Dither by a fraction of a colour step before the 8-bit write, breaking the bands.
+
+Longest flat band against dither amplitude, measured:
+
+| `dither` | Longest flat band |
+| --- | --- |
+| 0 | 127px |
+| 1 | 17px |
+| **2** (shipped) | **7px** |
+| 3 | 4px |
+| 4 | 4px, no further gain |
+
+It is also far cheaper. The fragment shader costs **0.035ms/frame** at 3818x1800 on
+an M2 Pro — about 2ms of GPU per second at 58fps, against ~47ms of CPU per second for
+the 2D path.
+
+The blob table is compiled into the shader source so it stays the single source of
+truth. Source-over compositing is associative, so applying each blob onto the base in
+order gives exactly the 2D path's accumulate-then-composite result.
 
 ## Install
 

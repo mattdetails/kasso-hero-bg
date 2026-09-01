@@ -15,11 +15,15 @@
     fps: 58,
     speed: 3,
     intensity: 1.95,
-    // Device-pixel scale. 1 = one canvas pixel per CSS pixel (browser then
-    // upscales 2x on a retina display, which is invisible on a field this
-    // soft). 2 = fully native. Cost scales with the square of this.
-    pixelRatio: 1.5,
-    dither: 1.0,      // amplitude in 1/255 units; 0 disables
+    // Device-pixel scale cap. 2 = fully native on a retina display. Measured
+    // at 0.035ms/frame for 3818x1800 on an M2 Pro, so there is no reason to
+    // render below native.
+    pixelRatio: 2,
+    // Dither amplitude in 1/255 units, applied before the 8-bit write.
+    // Measured longest flat band on a 3818px scanline: 0 -> 127px, 1 -> 17px,
+    // 2 -> 7px, 3 -> 4px, 4 -> no further gain. 2 removes visible banding
+    // without adding perceptible grain.
+    dither: 2.0,
     maxAspect: 4
   };
 
