@@ -1,4 +1,4 @@
-/*! Kasso hero — ambient background (POC) v4
+/*! Kasso hero — ambient background (POC) v5
  *  Drops a slow-drifting light field behind the hero card.
  *  No dependencies. ~6KB. Safe to load from <head> (defers itself).
  */
@@ -11,10 +11,10 @@
       "#sc-hero-header-card-horizontal section",
       "[id^='sc-hero'] section"
     ],
-    fps: 24,          // 24 is plenty for motion this slow
-    speed: 1,         // 0.5 = half as fast, 2 = twice as fast
-    intensity: 1,     // 0.5 = half as strong; raise to make it more obvious
-    resolution: 200   // canvas backing width in px; upscaled by the browser
+    fps: 58,          // frames per second cap
+    speed: 3,         // multiplier on the calibrated drift rates below
+    intensity: 1.95,  // multiplier on blob alpha
+    resolution: 440   // canvas backing width in px; upscaled by the browser
   };
 
   // Clamp on height/width, so a transient layout can't allocate a huge canvas.
@@ -112,12 +112,15 @@
       return;
     }
 
-    var running = false, raf = 0, last = 0, start = 0, frame = 1000 / CONFIG.fps;
+    var running = false, raf = 0, last = 0, start = 0;
 
     function loop(now) {
       raf = requestAnimationFrame(loop);
       if (!start) start = now;
-      if (now - last < frame) return;
+      // 10% slack. Without it a target whose interval sits just above the
+      // display's vsync (e.g. 58fps -> 17.24ms against a 16.67ms refresh)
+      // rejects every frame and delivers half the requested rate.
+      if (now - last < (1000 / CONFIG.fps) * 0.9) return;
       last = now;
       draw((now - start) / 1000);
     }

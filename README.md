@@ -41,17 +41,22 @@ originally, the brightest moving pixel in the visible frame changed by **0.5 out
 (diff two screenshots seconds apart and they differ) but read as a completely static
 gradient to anyone actually looking at it.
 
-The current rates put it near **3/255 per second**, about 20/255 over ten seconds,
-which reads as gentle drift without pulling focus. If you retune, measure the change
-per second rather than trusting a screenshot diff — that distinction is what the
-original rates got wrong.
+The current rates put the baseline near **3/255 per second**, about 20/255 over ten
+seconds. The shipped `CONFIG.speed` of 3 multiplies that to roughly 9/255 per second.
+If you retune, measure the change per second rather than trusting a screenshot diff —
+that distinction is what the original rates got wrong.
 
 ### Performance
 
-- Canvas renders at a **200px backing width** and is upscaled by the browser. The
-  gradients are soft enough that this is indistinguishable from full resolution, and
-  far cheaper than the full-size CSS blur this started as.
-- Capped at **24fps** — plenty for motion this slow.
+- Canvas renders at a **440px backing width** and is upscaled by the browser, which
+  is still far cheaper than the full-size CSS blur this started as.
+- Capped at **58fps**. The limiter allows 10% slack: without it, a target whose
+  interval sits just above the display's vsync (58fps is 17.24ms against a 16.67ms
+  refresh) rejects every frame and delivers half the requested rate. Measured at 35.5
+  of a requested 58 before the fix.
+- Draw cost at these settings is ~0.82ms/frame, about 47ms of CPU per second, versus
+  ~0.46ms and 11ms at 200px/24fps. Roughly 4.7% of the frame budget at 58fps on an
+  Apple-silicon Mac; proportionally more on low-end mobile.
 - An `IntersectionObserver` idles it when the hero scrolls out of view, and
   `visibilitychange` pauses it when the tab is backgrounded.
 - Honours `prefers-reduced-motion` by painting a single static frame.
@@ -82,10 +87,10 @@ The `CONFIG` block at the top of `hero-bg.js`:
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `intensity` | `1` | Deliberately subtle. `1.5` makes it clearly noticeable. |
-| `speed` | `1` | `0.5` = half as fast, `2` = twice as fast. |
-| `fps` | `24` | |
-| `resolution` | `200` | Canvas backing width in px. |
+| `intensity` | `1.95` | Multiplier on blob alpha. `1` is the subtle baseline. |
+| `speed` | `3` | Multiplier on the calibrated drift rates. |
+| `fps` | `58` | |
+| `resolution` | `440` | Canvas backing width in px. |
 | `targets` | — | Selector list, first match wins. |
 
 Colours live in the `BLOBS` array — each entry is an `[r,g,b]` plus a start
