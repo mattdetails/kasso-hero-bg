@@ -10,7 +10,7 @@ the site's head. No dependencies, no build step. Built as a proof of concept.
 | `navbar.js` | Full-width navbar at rest, floating pill on scroll |
 | `image-reveal.js` | Fades and slides images in as they enter the viewport |
 | `range-icons.js` | Animates the three icons in "The Range" section |
-| `smooth-scroll.js` | Locomotive Scroll v5 — **load as `type="module"`** |
+| `smooth-scroll.js` | Locomotive Scroll v5 smooth scrolling |
 
 `hero-bg-gl.js` supersedes `hero-bg.js` and carries its own 2D fallback, so load
 one or the other, never both — whichever runs first wins and the second is a no-op.
@@ -115,14 +115,29 @@ complete and nothing animates.
 
 ## smooth-scroll.js — Locomotive Scroll v5
 
-Loads Locomotive `5.0.1` through jsDelivr's `/+esm` endpoint, so it must be a module
-script:
+Loads Locomotive `5.0.1` through jsDelivr's `/+esm` endpoint. It uses a **dynamic**
+`import()`, which works in a classic script, so it loads exactly like the others:
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/mattdetails/kasso-hero-bg@SHA/smooth-scroll.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/mattdetails/kasso-hero-bg@SHA/smooth-scroll.js" defer></script>
 ```
 
-Module scripts are deferred by default, so no `defer` attribute.
+### Why dynamic import, not a static one
+
+A top-level `import` that fails has nothing to catch it, so the failure surfaces as an
+**uncaught promise rejection** in the console and the page silently loses smooth
+scrolling. The module graph here is two separate fetches — `locomotive-scroll@5.0.1/+esm`
+and the `lenis@1.3.17/+esm` it imports — and either can be blocked by a content
+blocker, a corporate proxy, or a flaky network.
+
+The dynamic import is wrapped in a `.catch`, so a CDN failure degrades to the browser's
+native scrolling and logs one warning. Verified by pointing `CONFIG.src` at a
+non-existent version: 0 unhandled rejections, 1 warning, `scroll-behavior` restored to
+the theme's own value, and the injected stylesheet removed rather than left behind.
+
+Worth knowing: the Locomotive bundle itself contains no `Promise`, `async`, `await`,
+`.then` or `.catch` at all, so this import is the only promise in the whole stack and
+therefore the only thing here that can produce a rejection.
 
 **Version 5 specifically, not 4.** v4 hijacks scrolling with a `transform` container:
 `window.scrollY` stays near zero, `position: fixed` misbehaves, and
